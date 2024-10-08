@@ -2,11 +2,11 @@
 #include <iostream>
 #include <cassert>
 
-constexpr const ulong MAX_RECORD_TIME = 5;
-constexpr const ulong SAMPLE_RATE = 44100;
-constexpr const ulong CHANNELS = 2;
-constexpr const ulong MAX_RECORD_SAMPLES = SAMPLE_RATE * MAX_RECORD_TIME;
-constexpr const ulong BUFFER_SIZE = MAX_RECORD_SAMPLES * sizeof(short) * CHANNELS;
+// constexpr const ulong MAX_RECORD_TIME = 5;
+// constexpr const ulong SAMPLE_RATE = 44100;
+// constexpr const ulong CHANNELS = 2;
+// constexpr const ulong MAX_RECORD_SAMPLES = SAMPLE_RATE * MAX_RECORD_TIME;
+// constexpr const ulong BUFFER_SIZE = MAX_RECORD_SAMPLES * sizeof(short) * CHANNELS;
 
 //将双通道数据合并为单通道
 int Recorder::MergeChannels(short* buff, int buff_size) {
