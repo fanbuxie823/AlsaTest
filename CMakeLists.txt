@@ -5,8 +5,8 @@ set(CMAKE_CXX_STANDARD 17)
 
 
 add_executable(alsaTest main.cc AlsaWrapper.cc
-        SoxResample.cpp
-        Recorder.cpp
+        SoxResample.cc
+        Recorder.cc
         )
 target_include_directories(alsaTest PUBLIC
         .
