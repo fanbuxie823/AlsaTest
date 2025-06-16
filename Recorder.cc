@@ -63,7 +63,7 @@ bool Recorder::InitRecorder(int samplerate, int channels) {
   }
 
   //初始化
-  if (alsa_recorder_->Init("hw:1,0") != 0) {
+  if (alsa_recorder_->Init("default") != 0) {
     return false;
   }
 
