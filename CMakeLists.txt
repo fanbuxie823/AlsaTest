@@ -16,3 +16,8 @@ target_link_libraries(alsaTest PUBLIC
         asound
         soxr
 )
+
+add_executable(alsaPlayTest playTest.cpp)
+target_link_libraries(alsaPlayTest PUBLIC
+        asound
+)

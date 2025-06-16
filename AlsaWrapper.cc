@@ -1,24 +1,22 @@
 #include "AlsaWrapper.hpp"
+
 #include <iostream>
 
-AlsaRecorder::AlsaRecorder(uint sample_rate, uint channel) : sample_rate_(sample_rate), channels_(channel) {
-}
+AlsaRecorder::AlsaRecorder(uint sample_rate, uint channel) : sample_rate_(sample_rate), channels_(channel) {}
 
 AlsaRecorder::~AlsaRecorder() {
-  if (inited_)
-    DeInit();
+  if (inited_) DeInit();
 }
 
-//对特定的设备进行初始化
+// 对特定的设备进行初始化
 int AlsaRecorder::Init(const char* device_name) {
   snd_device_ = device_name;
   auto ret = InitSoundcard();
-  if (ret == 0)
-    inited_ = true;
+  if (ret == 0) inited_ = true;
   return ret;
 }
 
-//重置设备
+// 重置设备
 int AlsaRecorder::DeInit() {
   inited_ = false;
   started_ = false;
@@ -29,75 +27,74 @@ int AlsaRecorder::DeInit() {
   return 0;
 }
 
-//初始化声卡
+// 初始化声卡
 int AlsaRecorder::InitSoundcard() {
   int err = 0;
 
-  //打开pcm句柄
+  // 打开pcm句柄
   if ((err = snd_pcm_open(&capture_handle_, snd_device_, SND_PCM_STREAM_CAPTURE, 0)) < 0) {
-    std::cerr << "[ALSA] cannot open audio device " << snd_device_ << "("
-        << snd_strerror(err) << ", " << err << ")"
-        << "\n";
+    std::cerr << "[ALSA] cannot open audio device " << snd_device_ << "(" << snd_strerror(err) << ", " << err << ")"
+              << "\n";
     return OPEN_ERROR;
   }
 
-  //分配hw_params结构的内存
+  // 分配hw_params结构的内存
   if ((err = snd_pcm_hw_params_malloc(&hw_params_)) < 0) {
     std::cerr << "[ALSA] cannot allocate hardware parameter structure "
-        << "(" << snd_strerror(err) << ", " << err << ")"
-        << "\n";
+              << "(" << snd_strerror(err) << ", " << err << ")"
+              << "\n";
     return MALLOC_ERROR;
   }
 
-  //Fill params with a full configuration space for a PCM.
+  // Fill params with a full configuration space for a PCM.
   if ((err = snd_pcm_hw_params_any(capture_handle_, hw_params_)) < 0) {
     std::cerr << "[ALSA] cannot initialize hardware parameter structure "
-        << "(" << snd_strerror(err) << ", " << err << ")"
-        << "\n";
+              << "(" << snd_strerror(err) << ", " << err << ")"
+              << "\n";
     return ANY_ERROR;
   }
 
-  //Restrict a configuration space to contain only one access type.
-  //SND_PCM_ACCESS_RW_NONINTERLEAVED。非交错访问。每个 PCM 帧只是一个声道需要的数据
+  // Restrict a configuration space to contain only one access type.
+  // SND_PCM_ACCESS_RW_NONINTERLEAVED。非交错访问。每个 PCM 帧只是一个声道需要的数据
   if ((err = snd_pcm_hw_params_set_access(capture_handle_, hw_params_, SND_PCM_ACCESS_RW_INTERLEAVED)) < 0) {
     std::cerr << "[ALSA] cannot set access type " << "(" << snd_strerror(err) << ", " << err << ")"
-        << "\n";
+              << "\n";
     return ACCESS_ERROR;
   }
 
-  //设置格式Signed 16 bit Little Endian
+  // 设置格式Signed 16 bit Little Endian
   if ((err = snd_pcm_hw_params_set_format(capture_handle_, hw_params_, SND_PCM_FORMAT_S16_LE)) < 0) {
     std::cerr << "[ALSA] cannot set sample format "
-        << "(" << snd_strerror(err) << ", " << err << ")"
-        << "\n";
+              << "(" << snd_strerror(err) << ", " << err << ")"
+              << "\n";
     return FORMAT_ERROR;
   }
 
-  //获取相关参数
+  // 获取相关参数
   uint channel_min = 0, channel_max = 0, samplerate_min = 0, samplerate_max = 0;
   do {
     if ((err = snd_pcm_hw_params_get_channels_min(hw_params_, &channel_min)) < 0) {
       std::cerr << "[ALSA] cannot initialize hardware parameter structure "
-          << "(" << snd_strerror(err) << ", " << err << ")"
-          << "\n";
+                << "(" << snd_strerror(err) << ", " << err << ")"
+                << "\n";
       break;
     }
     if ((err = snd_pcm_hw_params_get_channels_max(hw_params_, &channel_max)) < 0) {
       std::cerr << "[ALSA] cannot initialize hardware parameter structure "
-          << "(" << snd_strerror(err) << ", " << err << ")"
-          << "\n";
+                << "(" << snd_strerror(err) << ", " << err << ")"
+                << "\n";
       break;
     }
     if ((err = snd_pcm_hw_params_get_rate_min(hw_params_, &samplerate_min, nullptr)) < 0) {
       std::cerr << "[ALSA] cannot initialize hardware parameter structure "
-          << "(" << snd_strerror(err) << ", " << err << ")"
-          << "\n";
+                << "(" << snd_strerror(err) << ", " << err << ")"
+                << "\n";
       break;
     }
     if ((err = snd_pcm_hw_params_get_rate_max(hw_params_, &samplerate_max, nullptr)) < 0) {
       std::cerr << "[ALSA] cannot initialize hardware parameter structure "
-          << "(" << snd_strerror(err) << ", " << err << ")"
-          << "\n";
+                << "(" << snd_strerror(err) << ", " << err << ")"
+                << "\n";
       break;
     }
   } while (false);
@@ -105,13 +102,13 @@ int AlsaRecorder::InitSoundcard() {
   std::cout << "[ALSA] channel:" << channel_min << "~" << channel_max << std::endl;
   std::cout << "[ALSA] sample_rate:" << samplerate_min << "~" << samplerate_max << std::endl;
 
-  //设置采样率
+  // 设置采样率
   if (snd_pcm_hw_params_test_rate(capture_handle_, hw_params_, sample_rate_, 0) != 0) {
     std::cerr << "[ALSA] samplerate " << sample_rate_ << " is not support ";
     if ((err = snd_pcm_hw_params_get_rate_min(hw_params_, &sample_rate_, nullptr)) < 0) {
       std::cerr << "\ncannot get min samplerate "
-          << "(" << snd_strerror(err) << ", " << err << ")"
-          << "\nstop";
+                << "(" << snd_strerror(err) << ", " << err << ")"
+                << "\nstop";
       return RATE_ERROR;
     }
     std::cerr << "will set as " << sample_rate_ << std::endl;
@@ -121,13 +118,13 @@ int AlsaRecorder::InitSoundcard() {
     return RATE_ERROR;
   }
 
-  //设置采样率
+  // 设置采样率
   if (snd_pcm_hw_params_test_channels(capture_handle_, hw_params_, channels_) != 0) {
     std::cerr << "[ALSA] channels " << channels_ << " is not support ";
     if ((err = snd_pcm_hw_params_get_channels_min(hw_params_, &channels_)) < 0) {
       std::cerr << "\ncannot get min channels "
-          << "(" << snd_strerror(err) << ", " << err << ")"
-          << "\nstop";
+                << "(" << snd_strerror(err) << ", " << err << ")"
+                << "\nstop";
       return CHANNELS_ERROR;
     }
     std::cerr << "will set as " << channels_ << std::endl;
@@ -139,23 +136,23 @@ int AlsaRecorder::InitSoundcard() {
   return err;
 }
 
-//启动声卡
+// 启动声卡
 int AlsaRecorder::StartSoundcard() {
   int err;
-  //Install one PCM hardware configuration chosen from a configuration space and snd_pcm_prepare it.
+  // Install one PCM hardware configuration chosen from a configuration space and snd_pcm_prepare it.
   if ((err = snd_pcm_hw_params(capture_handle_, hw_params_)) < 0) {
     std::cerr << "[ALSA] cannot set parameters " << "(" << snd_strerror(err) << ", " << err << ")" << "\n";
     return PARAMS_ERROR;
   }
 
-  //Prepare PCM for use.
+  // Prepare PCM for use.
   if ((err = snd_pcm_prepare(capture_handle_)) < 0) {
-    std::cerr << "[ALSA] cannot prepare audio interface for use " << "(" << snd_strerror(err) << ", " << err << ")" <<
-        "\n";
+    std::cerr << "[ALSA] cannot prepare audio interface for use " << "(" << snd_strerror(err) << ", " << err << ")"
+              << "\n";
     return PREPARE_ERROR;
   }
 
-  //Start a PCM.
+  // Start a PCM.
   if ((err = snd_pcm_start(capture_handle_)) < 0) {
     std::cerr << "[ALSA] cannot start soundcard " << "(" << snd_strerror(err) << ", " << err << ")" << "\n";
     return START_ERROR;
@@ -164,14 +161,14 @@ int AlsaRecorder::StartSoundcard() {
   return 0;
 }
 
-//进行录音
+// 进行录音
 int AlsaRecorder::DoRecord(char* buff, int buff_size) {
-  //启动声卡
+  // 启动声卡
   if (!started_ && StartSoundcard() != 0) {
     return -1;
   }
 
-  int sample_num = sample_rate_ / 50; //20ms的样本数
+  int sample_num = sample_rate_ / 50;  // 20ms的样本数
   int inner_buff_size = sample_num * channels_ * sizeof(short);
   char inner_buff[inner_buff_size];
   int ret = 0, filled_len = inner_buff_size;
@@ -179,14 +176,14 @@ int AlsaRecorder::DoRecord(char* buff, int buff_size) {
   do {
     if ((ret = snd_pcm_readi(capture_handle_, &inner_buff, sample_num)) != sample_num) {
       std::cerr << "[ALSA] read from audio interface failed "
-          << "(" << snd_strerror(ret) << ", " << ret << ")"
-          << "\n";
+                << "(" << snd_strerror(ret) << ", " << ret << ")"
+                << "\n";
       if (ret == -32) {
         // Broken pipe
         if ((ret = snd_pcm_prepare(capture_handle_)) < 0) {
           std::cerr << "cannot prepare audio interface for use "
-              << "(" << snd_strerror(ret) << ", " << ret << ")"
-              << "\n";
+                    << "(" << snd_strerror(ret) << ", " << ret << ")"
+                    << "\n";
           return PREPARE_ERROR;
         }
       } else
@@ -203,4 +200,144 @@ int AlsaRecorder::DoRecord(char* buff, int buff_size) {
     p_buff += filled_len;
   } while (buff_size > 0);
   return 0;
+}
+
+AlsaPlayer::AlsaPlayer(uint sample_rate, uint channel) : sample_rate_(sample_rate), channels_(channel) {}
+
+AlsaPlayer::~AlsaPlayer() {
+  if (inited_) DeInit();
+}
+
+int AlsaPlayer::Init(const char* device_name) {
+  snd_device_ = device_name;
+  auto ret = InitSoundcard();
+  if (ret == 0) {
+    inited_ = true;
+    inner_buff_ptr_ = std::make_unique<KRingBuff<short>>(frames_size_ * channels_ * 4);
+    frame_buff_ptr_ = std::make_unique<short[]>(frames_size_ * channels_);
+  };
+
+  return ret;
+}
+
+int AlsaPlayer::DeInit() {
+  inited_ = false;
+  started_ = false;
+  snd_pcm_hw_params_free(hw_params_);
+  snd_pcm_close(playback_handle_);
+  hw_params_ = nullptr;
+  snd_config_update_free_global();
+  inner_buff_ptr_ = nullptr;
+  frame_buff_ptr_ = nullptr;
+  return 0;
+}
+
+int AlsaPlayer::InitSoundcard() {
+  int err = 0;
+  err = snd_pcm_open(&playback_handle_, snd_device_, SND_PCM_STREAM_PLAYBACK, 0);
+  if (err < 0) {
+    std::cerr << "[ALSA-P] cannot open audio device " << snd_device_ << "(" << snd_strerror(err) << ", " << err << ")"
+              << "\n";
+    return OPEN_ERROR;
+  }
+
+  /* 分配一个硬件参数对象 */
+  // 分配hw_params结构的内存
+  if ((err = snd_pcm_hw_params_malloc(&hw_params_)) < 0) {
+    std::cerr << "[ALSA-P] cannot allocate hardware parameter structure "
+              << "(" << snd_strerror(err) << ", " << err << ")"
+              << "\n";
+    return MALLOC_ERROR;
+  }
+  // Fill params with a full configuration space for a PCM.
+  if ((err = snd_pcm_hw_params_any(playback_handle_, hw_params_)) < 0) {
+    std::cerr << "[ALSA-P] cannot initialize hardware parameter structure "
+              << "(" << snd_strerror(err) << ", " << err << ")"
+              << "\n";
+    return ANY_ERROR;
+  }
+  //
+  if ((err = snd_pcm_hw_params_set_access(playback_handle_, hw_params_, access_mode_)) < 0) {
+    std::cerr << "[ALSA-P] cannot set access type " << "(" << snd_strerror(err) << ", " << err << ")"
+              << "\n";
+    return ACCESS_ERROR;
+  }
+
+  /* 设置硬件参数 */
+  err = snd_pcm_hw_params_set_format(playback_handle_, hw_params_, format_);
+  if (err < 0) {
+    std::cerr << "[ALSA-P] cannot set format " << "(" << snd_strerror(err) << ", " << err << ")"
+              << "\n";
+    return FORMAT_ERROR;
+  }
+  err = snd_pcm_hw_params_set_channels(playback_handle_, hw_params_, channels_); /* 通道数 Two channels (stereo) */
+  if (err < 0) {
+    std::cerr << "[ALSA-P] cannot set channel " << "(" << snd_strerror(err) << ", " << err << ")"
+              << "\n";
+    return CHANNELS_ERROR;
+  }
+  err = snd_pcm_hw_params_set_rate_near(playback_handle_, hw_params_, &sample_rate_, nullptr);
+  if (err < 0) {
+    std::cerr << "[ALSA-P] cannot set rate " << "(" << snd_strerror(err) << ", " << err << ")"
+              << "\n";
+    return RATE_ERROR;
+  }
+  err = snd_pcm_hw_params_set_period_size_near(playback_handle_, hw_params_, &frames_size_,
+                                               nullptr);  // 设置一个周期的多少帧
+  if (err < 0) {
+    std::cerr << "[ALSA-P] cannot set period " << "(" << snd_strerror(err) << ", " << err << ")"
+              << "\n";
+    return FRAME_ERROR;
+  }
+  return 0;
+}
+
+int AlsaPlayer::StartSoundcard() {
+  if (!inited_) {
+    std::cerr << "[ALSA-P] need init first!" << "\n";
+    return NOT_INIT;
+  }
+  int err = snd_pcm_hw_params(playback_handle_, hw_params_); /* 将设置好的参数写入驱动 */
+  if (err < 0) {
+    std::cerr << "[ALSA-P] unable to set hw parameters: " << "(" << snd_strerror(err) << ", " << err << ")"
+              << "\n";
+    return PARAMS_ERROR;
+  }
+  return SUCCESS;
+}
+
+int AlsaPlayer::DoPlay(short* buff, int buff_size) {
+  if (!started_ && StartSoundcard() != 0) {
+    return NOT_START;
+  }
+
+  // 将数据写入缓存
+  if (inner_buff_ptr_->WriteIn(buff, buff_size) != buff_size) {
+    std::cerr << "[ALSA-P] writein not complete,maybe buffer size is too large:" << buff_size << "\n";
+  }
+
+  // 开始播放数据
+  int rc = 0;
+  while (inner_buff_ptr_->GetUsedLen() > frames_size_) {
+    inner_buff_ptr_->ReadOut(frame_buff_ptr_.get(), frames_size_);
+    // 开始写入
+    rc = snd_pcm_writei(playback_handle_, frame_buff_ptr_.get(), frames_size_);
+    if (rc > 0 && rc < frames_size_) {
+      std::cerr << "short write" << "\n";
+    } else if (rc == -EPIPE) {
+      std::cerr << "underrun occurred" << "\n";
+      snd_pcm_prepare(playback_handle_);
+    } else if (rc < 0) {
+      std::cerr << "error from writei:" << snd_strerror(rc) << "\n";
+      break;
+    }
+  }
+  return SUCCESS;
+}
+void AlsaPlayer::StopPlay(bool immediate) {
+  if (immediate) {
+    snd_pcm_drop(playback_handle_);
+    return;
+  }
+  snd_pcm_drain(playback_handle_);
 }
