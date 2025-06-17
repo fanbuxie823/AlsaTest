@@ -25,6 +25,7 @@ enum AlsaError {
   SNDREAD_ERROR,
   START_ERROR,
   FRAME_ERROR,
+  PLAY_ERROR,
 };
 
 class AlsaRecorder {
@@ -58,7 +59,7 @@ class AlsaPlayer {
   AlsaPlayer(uint sample_rate, uint channel);
   ~AlsaPlayer();
   int Init(const char* device_name);
-  int DoPlay(short* buff, int buff_size);
+  int DoPlay(const short* buff, int buff_size);
   void StopPlay(bool immediate = false);
   int DeInit();
 
@@ -77,7 +78,7 @@ class AlsaPlayer {
 
   snd_pcm_t* playback_handle_{nullptr};
   snd_pcm_hw_params_t* hw_params_{nullptr};
-  snd_pcm_uframes_t frames_size_ = 256;                           // 一个周期多少帧
+  snd_pcm_uframes_t frames_size_ = 1024;                           // 一个周期多少帧
   snd_pcm_access_t access_mode_ = SND_PCM_ACCESS_RW_INTERLEAVED;  // 访问模式:交错访问
   snd_pcm_format_t format_ = SND_PCM_FORMAT_S16_LE;               // 采样位数:16位,小端存储
 

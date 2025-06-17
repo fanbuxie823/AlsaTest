@@ -11,7 +11,7 @@ snd_pcm_uframes_t frames = 1024;                               // 一个周期�
 snd_pcm_access_t access_mode = SND_PCM_ACCESS_RW_INTERLEAVED;  // 访问模式:交错访问
 snd_pcm_format_t format = SND_PCM_FORMAT_S16_LE;               // 采样位数:16位,小端存储
 int channel = 1;
-unsigned int simple_rate = 16000;  // 采样率
+unsigned int simple_rate = 22050;  // 采样率
 int dir;                           // 设备采样率与输入采样的偏差
 
 constexpr int size = 1024 * 2;  // 缓冲区大小
@@ -85,5 +85,7 @@ int main() {
   // snd_pcm_drop(handle); // 丢弃缓冲区
   // std::cout << "droped" << std::endl;
   std::this_thread::sleep_for(std::chrono::seconds(2));
+  snd_pcm_hw_params_free(params);
   snd_pcm_close(handle);
+  snd_config_update_free_global();
 }

@@ -1,31 +1,30 @@
 #ifndef PLAYER_HPP
 #define PLAYER_HPP
+#include <alsa/asoundlib.h>
+
 #include <thread>
 
-using PlayerCallBackFuncType = std::function<void(short* data, int data_size)>;
+#include "AlsaWrapper.hpp"
+#include "KRingBuff.hpp"
 
+#endif  // PLAYER_HPP
 class Player {
  private:
-  PlayerCallBackFuncType call_back_func_{nullptr};
-  std::thread player_thread_;
-
-  void DoPlay();
+  int channels_{1};
+  int samplerate_{22400};
+  int frame_size_{1024};
+  std::unique_ptr<AlsaPlayer> alsa_palyer_{nullptr};
 
  public:
-  // Default
-  Player() = default;
+  Player();
   ~Player();
 
   // 初始化
   bool InitPlayer(int samplerate = 16000, int channels = 1);
   // 设置回调函数
-  bool SetCallBackFunc(const PlayerCallBackFuncType& func) { call_back_func_ = func; }
-  // 开始播放
-  bool StartPlayer();
+  int DoPlay(const short *buffer, int buffer_size);  // 返回值表示实际写入了多少
   // 停止播放
   void StopPlayer(bool immediate = true);
   // 释放资源
   void ReleasePlayer();
 };
-
-#endif  // PLAYER_HPP

@@ -209,10 +209,9 @@ AlsaPlayer::~AlsaPlayer() {
 }
 
 int AlsaPlayer::Init(const char* device_name) {
-  snd_device_ = device_name;
+  if (device_name) snd_device_ = device_name;
   auto ret = InitSoundcard();
   if (ret == 0) {
-    inited_ = true;
     inner_buff_ptr_ = std::make_unique<KRingBuff<short>>(frames_size_ * channels_ * 4);
     frame_buff_ptr_ = std::make_unique<short[]>(frames_size_ * channels_);
   };
@@ -221,19 +220,27 @@ int AlsaPlayer::Init(const char* device_name) {
 }
 
 int AlsaPlayer::DeInit() {
+  StopPlay(true);
   inited_ = false;
   started_ = false;
+  printf("snd_pcm_hw_params_free\n");
   snd_pcm_hw_params_free(hw_params_);
+  printf("snd_pcm_close\n");
   snd_pcm_close(playback_handle_);
   hw_params_ = nullptr;
   snd_config_update_free_global();
+  printf("snd_config_update_free_global\n");
   inner_buff_ptr_ = nullptr;
   frame_buff_ptr_ = nullptr;
   return 0;
 }
 
 int AlsaPlayer::InitSoundcard() {
-  int err = 0;
+  if (inited_) {
+    std::cerr << "[ALSA-P] Soundcard already inited" << std::endl;
+    return -1;
+  }
+  int err = 0, dir = 0;  // 设备采样率与输入采样的偏差;
   err = snd_pcm_open(&playback_handle_, snd_device_, SND_PCM_STREAM_PLAYBACK, 0);
   if (err < 0) {
     std::cerr << "[ALSA-P] cannot open audio device " << snd_device_ << "(" << snd_strerror(err) << ", " << err << ")"
@@ -276,19 +283,20 @@ int AlsaPlayer::InitSoundcard() {
               << "\n";
     return CHANNELS_ERROR;
   }
-  err = snd_pcm_hw_params_set_rate_near(playback_handle_, hw_params_, &sample_rate_, nullptr);
+  err = snd_pcm_hw_params_set_rate_near(playback_handle_, hw_params_, &sample_rate_, &dir);
   if (err < 0) {
     std::cerr << "[ALSA-P] cannot set rate " << "(" << snd_strerror(err) << ", " << err << ")"
               << "\n";
     return RATE_ERROR;
   }
   err = snd_pcm_hw_params_set_period_size_near(playback_handle_, hw_params_, &frames_size_,
-                                               nullptr);  // 设置一个周期的多少帧
+                                               &dir);  // 设置一个周期的多少帧
   if (err < 0) {
     std::cerr << "[ALSA-P] cannot set period " << "(" << snd_strerror(err) << ", " << err << ")"
               << "\n";
     return FRAME_ERROR;
   }
+  inited_ = true;
   return 0;
 }
 
@@ -303,16 +311,31 @@ int AlsaPlayer::StartSoundcard() {
               << "\n";
     return PARAMS_ERROR;
   }
+  started_ = true;
   return SUCCESS;
 }
 
-int AlsaPlayer::DoPlay(short* buff, int buff_size) {
+int AlsaPlayer::DoPlay(const short* buff, int buff_size) {
   if (!started_ && StartSoundcard() != 0) {
     return NOT_START;
   }
-
+  assert(buff_size == frames_size_);
+  // printf("snd_pcm_writei\n");
+  // auto rc = snd_pcm_writei(playback_handle_, buff, buff_size); // 阻塞的接口
+  // if (rc > 0 && rc < buff_size) {
+  //   printf("short write\n");
+  // } else if (rc == -EPIPE) {
+  //   printf("underrun occurred\n");
+  //   snd_pcm_prepare(playback_handle_);
+  // } else if (rc < 0) {
+  //   printf("error from writei: %s\n", snd_strerror(rc));
+  //   return PLAY_ERROR;
+  // }
+  //
+  // return SUCCESS;
   // 将数据写入缓存
-  if (inner_buff_ptr_->WriteIn(buff, buff_size) != buff_size) {
+  auto write_len = inner_buff_ptr_->WriteIn(buff, buff_size);
+  if (write_len != buff_size) {
     std::cerr << "[ALSA-P] writein not complete,maybe buffer size is too large:" << buff_size << "\n";
   }
 
@@ -332,8 +355,10 @@ int AlsaPlayer::DoPlay(short* buff, int buff_size) {
       break;
     }
   }
-  return SUCCESS;
+  return write_len;
+// #endif
 }
+
 void AlsaPlayer::StopPlay(bool immediate) {
   if (immediate) {
     snd_pcm_drop(playback_handle_);

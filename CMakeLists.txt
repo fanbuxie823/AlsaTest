@@ -21,3 +21,15 @@ add_executable(alsaPlayTest playTest.cpp)
 target_link_libraries(alsaPlayTest PUBLIC
         asound
 )
+
+################## player test #####################
+add_executable(AlsaPlayerTest
+        Player.cc
+        AlsaWrapper.cc
+)
+target_link_libraries(AlsaPlayerTest PUBLIC
+        asound
+)
+target_compile_definitions(AlsaPlayerTest PUBLIC
+        PLAYER_TEST
+)
